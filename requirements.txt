@@ -1,4 +1,6 @@
 requests
 pandas
+google-cloud-storage
+lxml
 
 
