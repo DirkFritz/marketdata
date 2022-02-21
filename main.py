@@ -5,6 +5,7 @@ import pandas as pd
 import datetime
 import urllib3
 urllib3.disable_warnings()
+from ndxdata import NdxData
 
 from google.cloud import storage
 
@@ -48,7 +49,7 @@ def HistoricData(contract_data,symbols):
       
         while r.status_code != 200 and r.status_code != 400:
             print(r.status_code)
-            print(r.text)
+            #print(r.text)
          
             r = requests.get(f" https://localhost:5000/v1/api/hmds/history?conid={conid}&period=6m&bar=1d",verify=False)
             
@@ -98,7 +99,6 @@ def main():
         for symbol in ndx_df['Ticker']:
             symbols = symbols + "," + symbol
 
-    #print(symbols)
     
         contract_data = RequestContractData(symbols)
      
@@ -108,11 +108,19 @@ def main():
 
         stocks_data_df.to_csv('ndxdata.csv')
 
-        upload_blob("lt-capital.de","ndxdata.csv","ndxdata.csv")
+        #upload_blob("lt-capital.de","ndxdata.csv","ndxdata.csv") 
 
-        r = requests.get(f"https://marketdata-339820.lm.r.appspot.com/update")
-        print(r.text)
+        ndx_data = NdxData(
+            "gs://lt-capital.de/nasdaq_screener.csv", "ndxdata.csv"
+        )
+        ndx_data.set_comparison_group(["AAPL", "GOOG", "GOOGL", "MSFT", "NVDA", "TSLA"])
+        date1 = datetime.strptime("2021/11/15 14:30:00", "%Y/%m/%d %H:%M:%S")
+        date2 = ndx_data.get_last_day()
 
+        ndxgroups_df = ndx_data.set_compare_dates(date1, date2)     
+
+        ndxgroups_df.to_csv("ndxgroups.csv") 
+        upload_blob("lt-capital.de","ndxgroups.csv","ndxgroups.csv")
 
     except:
         print("Fehler")  
