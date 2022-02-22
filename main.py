@@ -2,10 +2,11 @@ from time import sleep
 import requests
 import json
 import pandas as pd
-import datetime
+from datetime import datetime
 import urllib3
 urllib3.disable_warnings()
 from ndxdata import NdxData
+
 
 from google.cloud import storage
 
@@ -61,7 +62,7 @@ def HistoricData(contract_data,symbols):
             #print(historic_data["symbol"])
 
             for prices in historic_data["data"]:
-                time = datetime.datetime.fromtimestamp(prices['t'] / 1e3)
+                time = datetime.fromtimestamp(prices['t'] / 1e3)
         
                 stocks_data_df = pd.concat([stocks_data_df, pd.DataFrame([[symbol, time,prices['c']]],columns=['Symbol','DateTime', 'Price'])])
 
@@ -104,26 +105,26 @@ def main():
      
         stocks_data_df = HistoricData(contract_data,ndx_df['Ticker'])
 
-        print(stocks_data_df)
+        #print(stocks_data_df)
 
         stocks_data_df.to_csv('ndxdata.csv')
 
-        #upload_blob("lt-capital.de","ndxdata.csv","ndxdata.csv") 
+        upload_blob("lt-capital.de","ndxdata.csv","ndxdata.csv") 
 
         ndx_data = NdxData(
             "gs://lt-capital.de/nasdaq_screener.csv", "ndxdata.csv"
         )
         ndx_data.set_comparison_group(["AAPL", "GOOG", "GOOGL", "MSFT", "NVDA", "TSLA"])
-        date1 = datetime.strptime("2021/11/15 14:30:00", "%Y/%m/%d %H:%M:%S")
+        date1 = datetime.strptime("2021/11/15 15:30:00", "%Y/%m/%d %H:%M:%S")
         date2 = ndx_data.get_last_day()
-
+       
         ndxgroups_df = ndx_data.set_compare_dates(date1, date2)     
 
         ndxgroups_df.to_csv("ndxgroups.csv") 
         upload_blob("lt-capital.de","ndxgroups.csv","ndxgroups.csv")
 
-    except:
-        print("Fehler")  
+    except Exception as e:
+        print(e)  
     
 
 if __name__ == "__main__":
