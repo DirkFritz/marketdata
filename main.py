@@ -3,6 +3,7 @@ import requests
 import json
 import pandas as pd
 from datetime import datetime
+from dateutil import tz
 import urllib3
 urllib3.disable_warnings()
 from ndxdata import NdxData
@@ -59,12 +60,13 @@ def HistoricData(contract_data,symbols):
             historic_data = r.json()
 
       
-            #print(historic_data["symbol"])
+            print(historic_data)
 
             for prices in historic_data["data"]:
-                time = datetime.fromtimestamp(prices['t'] / 1e3)
-        
-                stocks_data_df = pd.concat([stocks_data_df, pd.DataFrame([[symbol, time,prices['c']]],columns=['Symbol','DateTime', 'Price'])])
+                time = datetime.utcfromtimestamp(prices['t'] / 1e3)
+                time = time.replace(hour=16, minute=00)
+                
+                stocks_data_df = pd.concat([stocks_data_df, pd.DataFrame([[symbol,time ,prices['c']]],columns=['Symbol','DateTime', 'Price'])])
 
     return stocks_data_df
 
@@ -115,7 +117,7 @@ def main():
             "gs://lt-capital.de/nasdaq_screener.csv", "ndxdata.csv"
         )
         ndx_data.set_comparison_group(["AAPL", "GOOG", "GOOGL", "MSFT", "NVDA", "TSLA"])
-        date1 = datetime.strptime("2021/11/15 15:30:00", "%Y/%m/%d %H:%M:%S")
+        date1 = datetime.strptime("2021/11/15 16:00:00", "%Y/%m/%d %H:%M:%S")
         date2 = ndx_data.get_last_day()
        
         ndxgroups_df = ndx_data.set_compare_dates(date1, date2)     
