@@ -1,12 +1,12 @@
-from time import sleep
+
 import requests
-import json
 import pandas as pd
-from datetime import datetime
-from dateutil import tz
+from datetime import datetime,timedelta
+
 import urllib3
 urllib3.disable_warnings()
 from ndxdata import NdxData
+from db import Db
 
 
 from google.cloud import storage
@@ -35,7 +35,7 @@ def FindConId(contracts_data):
 
 def HistoricData(contract_data,symbols):
 
-    stocks_data_df =  pd.DataFrame(columns=['Symbol','DateTime', 'Price'])
+    stocks_data_df =  pd.DataFrame(columns=['Symbol','DateTime', 'Open', 'Close','High','Low','Volumen'])
 
 
     for symbol in symbols:
@@ -46,14 +46,14 @@ def HistoricData(contract_data,symbols):
         print(conid)
      
      
-        r = requests.get(f" https://localhost:5000/v1/api/hmds/history?conid={conid}&period=6m&bar=1d",verify=False)
+        r = requests.get(f" https://localhost:5000/v1/api/hmds/history?conid={conid}&period=2d&bar=1d",verify=False)
 
       
         while r.status_code != 200 and r.status_code != 400:
             print(r.status_code)
             #print(r.text)
          
-            r = requests.get(f" https://localhost:5000/v1/api/hmds/history?conid={conid}&period=6m&bar=1d",verify=False)
+            r = requests.get(f" https://localhost:5000/v1/api/hmds/history?conid={conid}&period=4d&bar=1d",verify=False)
             
      
         if r.status_code == 200:
@@ -64,9 +64,9 @@ def HistoricData(contract_data,symbols):
 
             for prices in historic_data["data"]:
                 time = datetime.utcfromtimestamp(prices['t'] / 1e3)
-                time = time.replace(hour=16, minute=00)
+                time = time.replace(hour=0, minute=00)
                 
-                stocks_data_df = pd.concat([stocks_data_df, pd.DataFrame([[symbol,time ,prices['c']]],columns=['Symbol','DateTime', 'Price'])])
+                stocks_data_df = pd.concat([stocks_data_df, pd.DataFrame([[symbol,time ,prices['o'],prices['c'],prices['h'],prices['l'],prices['v']]],columns=['Symbol','DateTime', 'Open','Close','High','Low','Volumen'])])
 
     return stocks_data_df
 
@@ -93,6 +93,59 @@ def RequestContractData(symbols):
     return r.json()
 
 
+def init_stock_prices_db(db):
+
+    df = pd.read_csv("ndxdata_init.csv")
+    df["DateTime"] = pd.to_datetime( df["DateTime"])
+    db.drop_table()
+    db.create_table()
+
+    insert_historic(db, df)
+    
+   
+
+def historic_stock_data(db, date):
+        data_db =  db.select_historic_date(date)
+        data_db_df =  pd.DataFrame(columns=['Symbol','DateTime', 'Open', 'Close','High','Low','Volumen'])
+        data_db_df = pd.concat([data_db_df, pd.DataFrame(data_db,columns=['Symbol','DateTime', 'Open','Close','High','Low','Volumen'])])
+        return data_db_df
+
+
+def insert_historic(db, stocks_data):
+    for index, stock_data in stocks_data.iterrows():
+        symbol = stock_data['Symbol']
+        date =  stock_data['DateTime'].date()
+        open =  stock_data['Open']
+        close =  stock_data['Close']
+        high =  stock_data['High']
+        low =  stock_data['Low']
+        volume =  stock_data['Volumen']
+        db.insert_historic(symbol,date, open, close, high, low,volume)
+
+def insert_new_data_to_historic(db, stocks_data_df):
+    data_time_delta = datetime.today() - timedelta(days=7)
+    print(data_time_delta.date())
+
+    symbols = stocks_data_df["Symbol"].unique()
+       
+    data_db_df = historic_stock_data(db,data_time_delta.date() )
+
+    print(data_db_df[data_db_df["Symbol"]=="ZS"])
+
+
+    for symbol in symbols:
+        data_db_symbol = data_db_df[data_db_df["Symbol"]==symbol]
+        last_entry = data_db_symbol["DateTime"].max()
+        last_entry =datetime(last_entry.year, last_entry.month, last_entry.day)
+       
+        stocks_data_db_symbol = stocks_data_df[(stocks_data_df["Symbol"]==symbol) & (stocks_data_df["DateTime"]> last_entry) ]
+        insert_historic(db,stocks_data_db_symbol )                
+           
+
+    data_db_df = historic_stock_data(db,data_time_delta.date() )
+    print(data_db_df[data_db_df["Symbol"]=="ZS"])
+
+
 def main():
 
     try:
@@ -102,28 +155,30 @@ def main():
         for symbol in ndx_df['Ticker']:
             symbols = symbols + "," + symbol
 
-    
         contract_data = RequestContractData(symbols)
-     
         stocks_data_df = HistoricData(contract_data,ndx_df['Ticker'])
+        #stocks_data_df.to_csv('ndxdata.csv')
+        #stocks_data_df = pd.read_csv('ndxdata.csv')
+        #stocks_data_df["DateTime"] = pd.to_datetime( stocks_data_df["DateTime"])
+        db = Db()
+        #init_stock_prices_db(db)
+        insert_new_data_to_historic(db, stocks_data_df)       
 
-        #print(stocks_data_df)
+        db.close()
 
-        stocks_data_df.to_csv('ndxdata.csv')
+        #upload_blob("lt-capital.de","ndxdata.csv","ndxdata.csv") 
 
-        upload_blob("lt-capital.de","ndxdata.csv","ndxdata.csv") 
-
-        ndx_data = NdxData(
-            "gs://lt-capital.de/nasdaq_screener.csv", "ndxdata.csv"
-        )
-        ndx_data.set_comparison_group(["AAPL", "GOOG", "GOOGL", "MSFT", "NVDA", "TSLA"])
-        date1 = datetime.strptime("2021/11/15 16:00:00", "%Y/%m/%d %H:%M:%S")
-        date2 = ndx_data.get_last_day()
+        #ndx_data = NdxData(
+        #    "gs://lt-capital.de/nasdaq_screener.csv", "ndxdata.csv"
+        #)
+        #ndx_data.set_comparison_group(["AAPL", "GOOG", "GOOGL", "MSFT", "NVDA", "TSLA"])
+        #date1 = datetime.strptime("2021/11/15 16:00:00", "%Y/%m/%d %H:%M:%S")
+        #date2 = ndx_data.get_last_day()
        
-        ndxgroups_df = ndx_data.set_compare_dates(date1, date2)     
+        #ndxgroups_df = ndx_data.set_compare_dates(date1, date2)     
 
-        ndxgroups_df.to_csv("ndxgroups.csv") 
-        upload_blob("lt-capital.de","ndxgroups.csv","ndxgroups.csv")
+        #ndxgroups_df.to_csv("ndxgroups.csv") 
+        #upload_blob("lt-capital.de","ndxgroups.csv","ndxgroups.csv")
 
     except Exception as e:
         print(e)  

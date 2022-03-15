@@ -2,5 +2,6 @@ requests
 pandas
 google-cloud-storage
 lxml
-
+mysql-connector-python
+datetime
 
