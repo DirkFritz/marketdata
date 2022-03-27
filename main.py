@@ -5,7 +5,7 @@ from datetime import datetime,timedelta
 
 import urllib3
 urllib3.disable_warnings()
-from ndxdata import NdxData
+
 from db import Db
 
 
@@ -35,7 +35,7 @@ def FindConId(contracts_data):
 
 def HistoricData(contract_data,symbols):
 
-    stocks_data_df =  pd.DataFrame(columns=['Symbol','DateTime', 'Open', 'Close','High','Low','Volumen'])
+    stocks_data_df =  pd.DataFrame(columns=['Symbol','DateTime', 'Open', 'Close','High','Low','Volume'])
 
 
     for symbol in symbols:
@@ -53,7 +53,7 @@ def HistoricData(contract_data,symbols):
             print(r.status_code)
             #print(r.text)
          
-            r = requests.get(f" https://localhost:5000/v1/api/hmds/history?conid={conid}&period=4d&bar=1d",verify=False)
+            r = requests.get(f" https://localhost:5000/v1/api/hmds/history?conid={conid}&period=2d&bar=1d",verify=False)
             
      
         if r.status_code == 200:
@@ -66,7 +66,7 @@ def HistoricData(contract_data,symbols):
                 time = datetime.utcfromtimestamp(prices['t'] / 1e3)
                 time = time.replace(hour=0, minute=00)
                 
-                stocks_data_df = pd.concat([stocks_data_df, pd.DataFrame([[symbol,time ,prices['o'],prices['c'],prices['h'],prices['l'],prices['v']]],columns=['Symbol','DateTime', 'Open','Close','High','Low','Volumen'])])
+                stocks_data_df = pd.concat([stocks_data_df, pd.DataFrame([[symbol,time ,prices['o'],prices['c'],prices['h'],prices['l'],prices['v']]],columns=['Symbol','DateTime', 'Open','Close','High','Low','Volume'])])
 
     return stocks_data_df
 
@@ -95,7 +95,7 @@ def RequestContractData(symbols):
 
 def init_stock_prices_db(db):
 
-    df = pd.read_csv("ndxdata_init.csv")
+    df = pd.read_csv("ndxdata.csv")
     df["DateTime"] = pd.to_datetime( df["DateTime"])
     db.drop_table()
     db.create_table()
@@ -106,8 +106,8 @@ def init_stock_prices_db(db):
 
 def historic_stock_data(db, date):
         data_db =  db.select_historic_date(date)
-        data_db_df =  pd.DataFrame(columns=['Symbol','DateTime', 'Open', 'Close','High','Low','Volumen'])
-        data_db_df = pd.concat([data_db_df, pd.DataFrame(data_db,columns=['Symbol','DateTime', 'Open','Close','High','Low','Volumen'])])
+        data_db_df =  pd.DataFrame(columns=['Symbol','DateTime', 'Open', 'Close','High','Low','Volume'])
+        data_db_df = pd.concat([data_db_df, pd.DataFrame(data_db,columns=['Symbol','DateTime', 'Open','Close','High','Low','Volume'])])
         return data_db_df
 
 
@@ -119,7 +119,7 @@ def insert_historic(db, stocks_data):
         close =  stock_data['Close']
         high =  stock_data['High']
         low =  stock_data['Low']
-        volume =  stock_data['Volumen']
+        volume =  stock_data['Volume']
         db.insert_historic(symbol,date, open, close, high, low,volume)
 
 def insert_new_data_to_historic(db, stocks_data_df):
@@ -166,20 +166,7 @@ def main():
 
         db.close()
 
-        #upload_blob("lt-capital.de","ndxdata.csv","ndxdata.csv") 
-
-        #ndx_data = NdxData(
-        #    "gs://lt-capital.de/nasdaq_screener.csv", "ndxdata.csv"
-        #)
-        #ndx_data.set_comparison_group(["AAPL", "GOOG", "GOOGL", "MSFT", "NVDA", "TSLA"])
-        #date1 = datetime.strptime("2021/11/15 16:00:00", "%Y/%m/%d %H:%M:%S")
-        #date2 = ndx_data.get_last_day()
-       
-        #ndxgroups_df = ndx_data.set_compare_dates(date1, date2)     
-
-        #ndxgroups_df.to_csv("ndxgroups.csv") 
-        #upload_blob("lt-capital.de","ndxgroups.csv","ndxgroups.csv")
-
+     
     except Exception as e:
         print(e)  
     

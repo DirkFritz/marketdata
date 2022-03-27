@@ -7,11 +7,7 @@ class Db:
     def __init__(self):
 
         try:
-            self.connection = mysql.connector.connect(host='34.89.225.47',
-                                         database='stockprices',
-                                         user='root',
-                                         password='ltcapital')
-            if self.connection.is_connected():
+         if self.connection.is_connected():
                 db_Info = self.connection.get_server_info()
                 print("Connected to MySQL Server version ", db_Info)
                 self.cursor = self.connection.cursor()
@@ -24,6 +20,7 @@ class Db:
         self.connection.commit()
         self.cursor.close()
         self.connection.close()
+        print("Disconnected from MySQL")
 
     def create_table(self):
         sql ='''CREATE TABLE historic(symbol CHAR(5) NOT NULL,date DATE, open FLOAT, close FLOAT, high FLOAT, low FLOAT, volume INT)'''
