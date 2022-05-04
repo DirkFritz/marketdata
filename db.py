@@ -7,7 +7,7 @@ class Db:
     def __init__(self):
 
         try:
-         if self.connection.is_connected():
+            if self.connection.is_connected():
                 db_Info = self.connection.get_server_info()
                 print("Connected to MySQL Server version ", db_Info)
                 self.cursor = self.connection.cursor()
@@ -52,6 +52,29 @@ class Db:
     
         self.cursor.execute(sql)
         return self.cursor.fetchall()
+
+    def get_min_max(self,table, column):
+        sql = f"SELECT MIN({column}) FROM {table}"
+        self.cursor.execute(sql)
+        min = self.cursor.fetchall()
+        sql = f"SELECT MAX({column}) FROM {table}"
+        self.cursor.execute(sql)
+        max = self.cursor.fetchall()
+
+        return [min[0][0], max[0][0]]
+
+    def get_min_date_symbols(self, table, symbol):
+        sql = f"SELECT MIN(date) FROM {table} WHERE symbol = \'{symbol}\'"
+        self.cursor.execute(sql)
+        min = self.cursor.fetchall()
+        return min[0][0]  
+
+    def get_unique_values(self, col, table):
+        sql = f"SELECT DISTINCT({col}) FROM {table}"
+
+        self.cursor.execute(sql)
+        return self.cursor.fetchall()
+    
 
     
 
